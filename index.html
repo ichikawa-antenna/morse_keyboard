@@ -93,27 +93,41 @@
     let output = '';
     let pressTime = 0;
     let timer = null;
+    let audioCtx = null;
+    let oscillator = null;
 
     const tapArea = document.getElementById('tapArea');
     const morseView = document.getElementById('morse');
     const outputView = document.getElementById('output');
     const modeSelector = document.getElementById('mode');
 
-    function playBeep(duration = 100, frequency = 600) {
-      const context = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
+    function startBeep() {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      oscillator = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
       oscillator.connect(gain);
-      gain.connect(context.destination);
+      gain.connect(audioCtx.destination);
       oscillator.type = 'sine';
-      oscillator.frequency.value = frequency;
+      oscillator.frequency.value = 600;
+      gain.gain.setValueAtTime(1, audioCtx.currentTime);
       oscillator.start();
-      gain.gain.setValueAtTime(1, context.currentTime);
-      oscillator.stop(context.currentTime + duration / 1000);
+    }
+
+    function stopBeep() {
+      if (oscillator) {
+        oscillator.stop();
+        oscillator.disconnect();
+        oscillator = null;
+      }
+      if (audioCtx) {
+        audioCtx.close();
+        audioCtx = null;
+      }
     }
 
     tapArea.addEventListener('touchstart', () => {
       pressTime = Date.now();
+      startBeep();
     });
 
     tapArea.addEventListener('touchend', () => {
@@ -121,7 +135,7 @@
       const signal = duration < 300 ? '.' : '-';
       morseStr += signal;
       morseView.textContent = morseStr;
-      playBeep(duration < 300 ? 100 : 300);
+      stopBeep();
 
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
@@ -173,7 +187,6 @@
               const signal = duration < 300 ? '.' : '-';
               morseStr += signal;
               morseView.textContent = morseStr;
-              playBeep(duration < 300 ? 100 : 300);
 
               if (timer) clearTimeout(timer);
               timer = setTimeout(() => {

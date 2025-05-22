@@ -99,6 +99,19 @@
     const outputView = document.getElementById('output');
     const modeSelector = document.getElementById('mode');
 
+    function playBeep(duration = 100, frequency = 600) {
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+      oscillator.start();
+      gain.gain.setValueAtTime(1, context.currentTime);
+      oscillator.stop(context.currentTime + duration / 1000);
+    }
+
     tapArea.addEventListener('touchstart', () => {
       pressTime = Date.now();
     });
@@ -108,6 +121,7 @@
       const signal = duration < 300 ? '.' : '-';
       morseStr += signal;
       morseView.textContent = morseStr;
+      playBeep(duration < 300 ? 100 : 300);
 
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
@@ -130,7 +144,6 @@
       outputView.textContent = '';
     }
 
-    // マイク音声で音の長短を検出（単純な音量ベース検出）
     async function startMic() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -160,6 +173,7 @@
               const signal = duration < 300 ? '.' : '-';
               morseStr += signal;
               morseView.textContent = morseStr;
+              playBeep(duration < 300 ? 100 : 300);
 
               if (timer) clearTimeout(timer);
               timer = setTimeout(() => {

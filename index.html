@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>モールスキーボード</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 1em;
+      background: linear-gradient(to bottom right, #eef, #cce);
+    }
+    .tap-area {
+      margin: 1em auto;
+      width: 80vw;
+      height: 30vh;
+      background: #333;
+      color: white;
+      font-size: 1.2em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      user-select: none;
+      transition: background 0.3s;
+    }
+    .tap-area:active {
+      background: #555;
+    }
+    .output {
+      font-size: 2em;
+      margin-top: 1em;
+      word-break: break-all;
+      background: #fff;
+      padding: 0.5em;
+      border-radius: 8px;
+      box-shadow: 2px 2px 5px #aaa;
+    }
+    select, button {
+      font-size: 1em;
+      margin: 0.5em;
+      padding: 0.3em 0.5em;
+    }
+    #controls {
+      margin-top: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h1>モールスキーボード</h1>
+  <label for="mode">モード：</label>
+  <select id="mode">
+    <option value="en">英字モールス</option>
+    <option value="jp">和文モールス</option>
+  </select>
+
+  <div class="tap-area" id="tapArea">ここをタップして入力</div>
+  <div>入力中: <span id="morse"></span></div>
+  <div class="output" id="output"></div>
+
+  <div id="controls">
+    <button onclick="undoChar()">← 戻る</button>
+    <button onclick="clearOutput()">🗑️ 全消去</button>
+    <button onclick="startMic()">🎙️ マイク入力</button>
+  </div>
+
+  <script>
+    const enMorse = {
+      '.-': 'A', '-...': 'B', '-.-.': 'C', '-..': 'D', '.': 'E',
+      '..-.': 'F', '--.': 'G', '....': 'H', '..': 'I', '.---': 'J',
+      '-.-': 'K', '.-..': 'L', '--': 'M', '-.': 'N', '---': 'O',
+      '.--.': 'P', '--.-': 'Q', '.-.': 'R', '...': 'S', '-': 'T',
+      '..-': 'U', '...-': 'V', '.--': 'W', '-..-': 'X', '-.--': 'Y',
+      '--..': 'Z', '-----': '0', '.----': '1', '..---': '2',
+      '...--': '3', '....-': '4', '.....': '5', '-....': '6',
+      '--...': '7', '---..': '8', '----.': '9'
+    };
+
+    const jpMorse = {
+      '.-': 'イ', '-.-.': 'ロ', '...-': 'ハ', '-..-': 'ニ', '..-.': 'ホ',
+      '--.--': 'ヘ', '-.-..': 'ト', '----': 'チ', '-.--': 'リ', '--.': 'ヌ',
+      '....': 'ル', '-.': 'ヲ', '.---': 'ワ', '.-..': 'カ', '--.-': 'ヨ',
+      '-..': 'タ', '..-..': 'レ', '---.': 'ソ', '---': 'ツ', '.--.': 'ネ',
+      '--..': 'ナ', '..-': 'ラ', '-...': 'ム', '-..-.': 'ウ', '-.-': 'ヰ',
+      '.--': 'ノ', '..': 'オ', '.-.': 'ク', '...': 'ヤ', '----.': 'マ',
+      '-.-.-': 'ケ', '.-.-': 'フ', '...-.': 'コ', '.-.--': 'エ', '.-...': 'テ',
+      '.--..': 'ア', '..--': 'サ', '-.-.--': 'キ', '--.-.': 'ユ', '...--': 'メ',
+      '-..--': 'ミ', '--': 'シ', '-.---': 'ヱ', '.---.': 'ヒ', '---.-': 'モ'
+    };
+
+    let morseStr = '';
+    let output = '';
+    let pressTime = 0;
+    let timer = null;
+
+    const tapArea = document.getElementById('tapArea');
+    const morseView = document.getElementById('morse');
+    const outputView = document.getElementById('output');
+    const modeSelector = document.getElementById('mode');
+
+    tapArea.addEventListener('touchstart', () => {
+      pressTime = Date.now();
+    });
+
+    tapArea.addEventListener('touchend', () => {
+      const duration = Date.now() - pressTime;
+      const signal = duration < 300 ? '.' : '-';
+      morseStr += signal;
+      morseView.textContent = morseStr;
+
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const table = modeSelector.value === 'en' ? enMorse : jpMorse;
+        const char = table[morseStr] || '?';
+        output += char;
+        outputView.textContent = output;
+        morseStr = '';
+        morseView.textContent = '';
+      }, 1000);
+    });
+
+    function undoChar() {
+      output = output.slice(0, -1);
+      outputView.textContent = output;
+    }
+
+    function clearOutput() {
+      output = '';
+      outputView.textContent = '';
+    }
+
+    // マイク音声で音の長短を検出（単純な音量ベース検出）
+    async function startMic() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.fftSize);
+
+        let soundStart = 0;
+        let detecting = false;
+
+        function detectSound() {
+          analyser.getByteTimeDomainData(data);
+          const volume = data.reduce((sum, val) => sum + Math.abs(val - 128), 0) / data.length;
+          const threshold = 10;
+
+          if (volume > threshold) {
+            if (!detecting) {
+              detecting = true;
+              soundStart = Date.now();
+            }
+          } else {
+            if (detecting) {
+              const duration = Date.now() - soundStart;
+              const signal = duration < 300 ? '.' : '-';
+              morseStr += signal;
+              morseView.textContent = morseStr;
+
+              if (timer) clearTimeout(timer);
+              timer = setTimeout(() => {
+                const table = modeSelector.value === 'en' ? enMorse : jpMorse;
+                const char = table[morseStr] || '?';
+                output += char;
+                outputView.textContent = output;
+                morseStr = '';
+                morseView.textContent = '';
+              }, 1000);
+            }
+            detecting = false;
+          }
+          requestAnimationFrame(detectSound);
+        }
+        detectSound();
+      } catch (err) {
+        alert('マイクの使用が許可されていません。');
+      }
+    }
+  </script>
+</body>
+</html>

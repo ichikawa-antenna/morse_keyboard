@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>モールスキーボード</title>
   <style>
     body {
@@ -23,6 +23,8 @@
       justify-content: center;
       border-radius: 12px;
       user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
       transition: background 0.3s;
     }
     .tap-area:active {
@@ -125,12 +127,14 @@
       }
     }
 
-    tapArea.addEventListener('touchstart', () => {
+    tapArea.addEventListener('touchstart', (e) => {
+      e.preventDefault();
       pressTime = Date.now();
       startBeep();
-    });
+    }, { passive: false });
 
-    tapArea.addEventListener('touchend', () => {
+    tapArea.addEventListener('touchend', (e) => {
+      e.preventDefault();
       const duration = Date.now() - pressTime;
       const signal = duration < 300 ? '.' : '-';
       morseStr += signal;
@@ -146,7 +150,7 @@
         morseStr = '';
         morseView.textContent = '';
       }, 1000);
-    });
+    }, { passive: false });
 
     function undoChar() {
       output = output.slice(0, -1);
